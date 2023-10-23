@@ -2,7 +2,7 @@ bl_info = {
     "name": "DECALNIK: Font Atlas + Decal Generator",
     "blender": (3, 0, 0),
     "category": "Object",
-    "version": (1, 0, 1),
+    "version": (1, 0, 2),
     "author": "Mike Y",
     "description": "Generates a font atlas and mesh decals with text",
 }
@@ -14,6 +14,7 @@ import subprocess
 from bpy.props import StringProperty, IntProperty, EnumProperty, PointerProperty
 from bpy_extras.io_utils import ImportHelper
 from mathutils import Vector
+import re
 
 
 def is_pil_installed():
@@ -136,10 +137,11 @@ def create_text_decal(img, text):
         mat.use_nodes = True
         nodes = mat.node_tree.nodes
         texture_node = nodes.new(type='ShaderNodeTexImage')
-        texture_node.image = img
+        texture_node.image = img  # Assuming img is defined somewhere in your script
         shader = nodes["Principled BSDF"]
         mat.node_tree.links.new(texture_node.outputs["Color"], shader.inputs["Alpha"])
         mat.blend_method = 'CLIP'
+        mat.alpha_threshold = 0.1
     else:
         mat = bpy.data.materials[ATLAS_NAME]
 
@@ -153,19 +155,6 @@ def create_text_decal(img, text):
         v_min = 1 - (row + 1) / CELL_COUNT[1]
         v_max = 1 - row / CELL_COUNT[1]
         uv_dict[char] = [(u_min, v_min), (u_max, v_min), (u_max, v_max), (u_min, v_max)]
-
-    # Create a shared material
-    if ATLAS_NAME not in bpy.data.materials:
-        mat = bpy.data.materials.new(name=ATLAS_NAME)
-        mat.use_nodes = True
-        nodes = mat.node_tree.nodes
-        texture_node = nodes.new(type='ShaderNodeTexImage')
-        texture_node.image = bpy.data.images.get(ATLAS_NAME, None)
-        shader = nodes["Principled BSDF"]
-        mat.node_tree.links.new(texture_node.outputs["Color"], shader.inputs["Alpha"])
-        mat.blend_method = 'CLIP'
-    else:
-        mat = bpy.data.materials[ATLAS_NAME]
 
     # Calculate character widths if FONT_PATH is provided
     if FONT_PATH:
@@ -245,6 +234,12 @@ def create_text_decal(img, text):
     decal.location += view_vector * 0.001
 
     bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
+
+    # Set the object's name
+    first_line = text.split("\n")[0]
+    sanitized_name = re.sub(r'[^A-Za-z0-9_]', '',
+                            first_line)
+    decal.name = f"DECAL_text_{sanitized_name}"
 
 
 # UI
